@@ -1,0 +1,51 @@
+version: '3.7'
+
+services:
+  postgres:
+    image: postgres:alpine
+    container_name: postgres-quickstart
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-djang_quickstart}
+      POSTGRES_USER: ${POSTGRES_USER:-some_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-super_secret}
+    volumes:
+      - /data/django_quickstart:/var/lib/postgresql/data:rw
+
+  django:
+    build:
+      context: .
+      dockerfile: ./resources/django/Dockerfile
+    image: django:production
+    container_name: django-quickstart
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-djang_quickstart}
+      POSTGRES_USER: ${POSTGRES_USER:-some_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-super_secret}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+    command: >
+      sh -c "
+      python manage.py migrate &&
+      python manage.py collectstatic --no-input &&
+      gunicorn quickstart.wsgi:application --bind 0.0.0.0:8000 --workers=3
+      "
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    volumes:
+      - .:/app:z
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-django-quickstart
+    restart: always
+    volumes:
+      - .:/app:z
+      - ./resources/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "85:80"
+    depends_on:
+      - django
